@@ -2,7 +2,7 @@
 
 JS Port of minecraft version c0.0.12a with three.js as renderer
 
-![Preview](https://raw.githubusercontent.com/Fraeric123/c0.0.12a-JS-Port/main/screens/s1.png)
+![Preview](https://raw.githubusercontent.com/Fraeric123/c0.0.12a-JS-Port/refs/heads/main/screens/s1.png)
 
 ## Controls
 * WASD        - Movement
