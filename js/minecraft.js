@@ -1891,32 +1891,27 @@ class Level {
     }
 
     tick() {
-        this.unprocessed += this.width * this.height * this.depth;
-        let ticks = Math.floor(this.unprocessed / 200);
-        this.unprocessed -= ticks * 200;
+        const ticks = Math.floor((this.width * this.height * this.depth) / 4000);
+
         for (let i = 0; i < ticks; i++) {
+            const x = this.random.nextInt(this.width);
+            const y = this.random.nextInt(this.depth);
+            const z = this.random.nextInt(this.height);
 
-            this.randValue = (this.randValue * 1664525 + 1013904223) | 0;
-            let x = (this.randValue >> 16) & (this.width - 1);
+            const blockId = this.getTile(x, y, z);
 
-            this.randValue = (this.randValue * 1664525 + 1013904223) | 0;
-            let y = (this.randValue >> 16) & (this.depth - 1);
-
-            this.randValue = (this.randValue * 1664525 + 1013904223) | 0;
-            let z = (this.randValue >> 16) & (this.height - 1);
-
-            this.tickTile(x, y, z);
+            if (blockId !== 0 && Tile.tiles[blockId] && Tile.tiles[blockId].shouldTick) {
+                this.tickTile(x, y, z);
+            }
         }
     }
 
     tickTile(x, y, z) {
-        if (x < 0 || y < 0 || z < 0 || x >= this.width || y >= this.depth || z >= this.height) return;
+        const tileId = this.getTile(x, y, z);
+        const tile = Tile.tiles[tileId];
 
-        const id = this.blocks[(y * this.height + z) * this.width + x];
-
-        if (id !== 0 && Tile.tiles[id] && Tile.tiles[id].shouldTick) {
-            console.log(`Ticking tile at ${x}, ${y}, ${z} with id ${id}`);
-            Tile.tiles[id].tick(this, x, y, z, this.random);
+        if (tile != null) {
+            tile.tick(this, x, y, z, this.random);
         }
     }
 
