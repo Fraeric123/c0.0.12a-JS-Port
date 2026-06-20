@@ -1063,11 +1063,15 @@ class Entity {
         this.zd += za * cos - xa * sin;
     }
 
-    isLit() {
+    isLit(isHumanoid = false) {
         const xTile = Math.floor(this.x);
         const yTile = Math.floor(this.y);
         const zTile = Math.floor(this.z);
-        return (this.level.isLit(xTile, yTile, zTile));
+        if (isHumanoid) {
+            return (this.level.isLit(xTile, yTile, zTile) || this.level.isLit(xTile, yTile + 1, zTile));
+        } else {
+            return (this.level.isLit(xTile, yTile, zTile));
+        }
     }
 }
 
@@ -1200,7 +1204,7 @@ class Zombie extends Entity {
     render(a) {
         const time = (performance.now() / 1000) * 10 * this.speed + this.timeOffs;
 
-        let brightness = super.isLit() ? 1.0 : 0.3;
+        let brightness = super.isLit(true) ? 1.0 : 0.3;
 
         if (brightness != this.currentBrightness) {
             this.currentBrightness = brightness;
@@ -1849,6 +1853,9 @@ class Level {
         this.random = new JavaRandom(this.seed);
         this.randValue = this.random.nextInt();
 
+        this.tickBlocks = [];
+        this.tickBlocksMap = new Map();
+
         this.multiplier = 1664525;
         this.addend = 1013904223;
 
@@ -1877,6 +1884,44 @@ class Level {
         for (let i = 0; i < this.levelListeners.length; i++) this.levelListeners.get[i].allChanged();
     }
 
+    initTickBlocks() {
+        this.tickBlocks = [];
+        this.tickBlocksMap.clear();
+
+        for (let y = 0; y < this.depth; y++) {
+            for (let z = 0; z < this.height; z++) {
+                for (let x = 0; x < this.width; x++) {
+                    const blockId = this.getTile(x, y, z);
+                    if (blockId !== 0 && Tile.tiles[blockId] && Tile.tiles[blockId].shouldTick) {
+                        this.addTickBlock(x, y, z);
+                    }
+                }
+            }
+        }
+    }
+
+    addTickBlock(x, y, z) {
+        const idx = (y * this.height + z) * this.width + x;
+        if (!this.tickBlocksMap.has(idx)) {
+            this.tickBlocks.push(idx);
+            this.tickBlocksMap.set(idx, this.tickBlocks.length - 1);
+        }
+    }
+
+    removeTickBlock(x, y, z) {
+        const idx = (y * this.height + z) * this.width + x;
+        if (this.tickBlocksMap.has(idx)) {
+            const pos = this.tickBlocksMap.get(idx);
+            const lastIdx = this.tickBlocks[this.tickBlocks.length - 1];
+
+            this.tickBlocks[pos] = lastIdx;
+            this.tickBlocksMap.set(lastIdx, pos);
+
+            this.tickBlocks.pop();
+            this.tickBlocksMap.delete(idx);
+        }
+    }
+
     setData(w, d, h, blocks) {
         this.width = w;
         this.height = h;
@@ -1891,17 +1936,23 @@ class Level {
     }
 
     tick() {
-        const ticks = Math.floor((this.width * this.height * this.depth) / 4000);
+        if (this.tickBlocks.length === 0) return;
+        const ticksToProcess = Math.min(this.tickBlocks.length, 1);
 
-        for (let i = 0; i < ticks; i++) {
-            const x = this.random.nextInt(this.width);
-            const y = this.random.nextInt(this.depth);
-            const z = this.random.nextInt(this.height);
+        for (let i = 0; i < ticksToProcess; i++) {
+            const randPos = this.random.nextInt(this.tickBlocks.length);
+            const idx = this.tickBlocks[randPos];
 
-            const blockId = this.getTile(x, y, z);
+            const x = idx % this.width;
+            const remaining = Math.floor(idx / this.width);
+            const z = remaining % this.height;
+            const y = Math.floor(remaining / this.height);
 
+            const blockId = this.blocks[idx];
             if (blockId !== 0 && Tile.tiles[blockId] && Tile.tiles[blockId].shouldTick) {
                 this.tickTile(x, y, z);
+            } else {
+                this.removeTickBlock(x, y, z);
             }
         }
     }
@@ -2178,9 +2229,20 @@ class Level {
     setTile(x, y, z, type) {
         if (x < 0 || y < 0 || z < 0 || x >= this.width || y >= this.depth || z >= this.height)
             return false;
-        if (type == this.blocks[(y * this.height + z) * this.width + x])
+        const idx = (y * this.height + z) * this.width + x;
+        if (type == this.blocks[idx])
             return false;
-        this.blocks[(y * this.height + z) * this.width + x] = type;
+
+        const oldType = this.blocks[idx];
+        if (Tile.tiles[oldType] && Tile.tiles[oldType].shouldTick) {
+            this.removeTickBlock(x, y, z);
+        }
+
+        this.blocks[idx] = type;
+
+        if (Tile.tiles[type] && Tile.tiles[type].shouldTick) {
+            this.addTickBlock(x, y, z);
+        }
         this.neighborChanged(x - 1, y, z, type);
         this.neighborChanged(x + 1, y, z, type);
         this.neighborChanged(x, y - 1, z, type);
@@ -2196,9 +2258,20 @@ class Level {
     setTileNoUpdate(x, y, z, type) {
         if (x < 0 || y < 0 || z < 0 || x >= this.width || y >= this.depth || z >= this.height)
             return false;
-        if (type == this.blocks[(y * this.height + z) * this.width + x])
+        const idx = (y * this.height + z) * this.width + x;
+        if (type == this.blocks[idx])
             return false;
-        this.blocks[(y * this.height + z) * this.width + x] = type;
+
+        const oldType = this.blocks[idx];
+        if (Tile.tiles[oldType] && Tile.tiles[oldType].shouldTick) {
+            this.removeTickBlock(x, y, z);
+        }
+
+        this.blocks[idx] = type;
+
+        if (Tile.tiles[type] && Tile.tiles[type].shouldTick) {
+            this.addTickBlock(x, y, z);
+        }
         return true;
     }
 
@@ -3257,7 +3330,7 @@ class LiquidTile extends Tile {
         super(id);
         this.liquidType = liquidType;
 
-        this.tex = 14;
+        this.tex = 13;
         this.spreadSpeed = 1;
 
         if (liquidType == 2) this.tex = 30;
