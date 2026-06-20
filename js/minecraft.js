@@ -86,9 +86,9 @@ class PauseScreen extends Screen {
         }
     }
 
-    buttonClicked(button) {
+    async buttonClicked(button) {
         if (button.id === 0) {
-            this.minecraft.generateNewLevel();
+            await this.minecraft.generateNewLevel();
             if (!document.pointerLockElement) document.body.requestPointerLock();
             this.minecraft.setScreen(null);
         }
@@ -1664,12 +1664,12 @@ class LevelGen {
 
                 const size = Math.sin((l * Math.PI) / length) * 2.5 + 1.0;
 
-                const xStart = Math.trunc(x - size);
-                const xEnd = Math.trunc(x + size);
-                const yStart = Math.trunc(y - size);
-                const yEnd = Math.trunc(y + size);
-                const zStart = Math.trunc(z - size);
-                const zEnd = Math.trunc(z + size);
+                const xStart = (x - size) | 0;
+                const xEnd = (x + size) | 0;
+                const yStart = (y - size) | 0;
+                const yEnd = (y + size) | 0;
+                const zStart = (z - size) | 0;
+                const zEnd = (z + size) | 0;
 
                 for (let xx = xStart; xx <= xEnd; xx++) {
                     for (let yy = yStart; yy <= yEnd; yy++) {
@@ -3863,11 +3863,13 @@ class Minecraft {
 
         await this.generateNewLevel();
 
+        this.setScreen(new PauseScreen());
+
         this.setupControls();
 
         this.updateGUIBlock();
 
-        this.render();
+        this.render();        
     }
 
     loop() {
