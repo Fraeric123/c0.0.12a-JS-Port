@@ -2463,6 +2463,8 @@ class LevelRenderer {
 
         this.chunks = new Array(this.xChunks * this.yChunks * this.zChunks);
 
+        this.drawDistance = 0;
+
         for (let x = 0; x < this.xChunks; x++) {
             for (let y = 0; y < this.yChunks; y++) {
                 for (let z = 0; z < this.zChunks; z++) {
@@ -2751,9 +2753,35 @@ class LevelRenderer {
     render(player, layer) {
         Chunk.rebuiltThisFrame = 0;
 
+        const xd = player.x - this.lX;
+        const yd = player.y - this.lY;
+        const zd = player.z - this.lZ;
+
+        if ((xd * xd + yd * yd + zd * zd) > 64.0) {
+            this.lX = player.x;
+            this.lY = player.y;
+            this.lZ = player.z;
+
+            this.chunks.sort((chunkA, chunkB) => {
+                return chunkA.distanceToSqr(player) - chunkB.distanceToSqr(player);
+            });
+        }
+
+        const dd = 256 >> this.drawDistance;
+        const maxDistanceSqr = dd * dd;
+
         this.chunks.forEach(chunk => {
-            chunk.render(layer);
+            if (chunk.visible) {
+
+                if (this.drawDistance === 0 || chunk.distanceToSqr(player) < maxDistanceSqr) {
+                    chunk.render(layer);
+                }
+            }
         });
+    }
+
+    toggleDrawDistance() {
+        this.drawDistance = (this.drawDistance + 1) % 4;
     }
 
     updateDirtyChunks(player, camera) {
@@ -4056,8 +4084,9 @@ class Minecraft {
                 this.paintTexture = 6;
                 this.updateGUIBlock();
             }
-            if (e.code === 'KeyP') {
-                this.setScreen(new LevelGenScreen());
+            if (e.code === 'KeyF') {
+                this.levelRenderer.toggleDrawDistance();
+                console.log(this.levelRenderer.drawDistance);
             }
             //console.log(e.code);
         });
